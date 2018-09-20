@@ -1,0 +1,7 @@
+{
+    "emails": {
+        "dev": { "type": "BOOL", "value": true },
+        "prod": { "type": "BOOL", "value": true },
+        "default": { "type": "PERCENT", "value": 30 }
+    }
+}

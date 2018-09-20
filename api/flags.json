@@ -1,7 +1,0 @@
-{
-    "emails": {
-        "dev": "on",
-        "prod": "off",
-        "default": "off"
-    }
-}
