@@ -31,4 +31,9 @@ Note: ENV_NAME is optional but could be useful for customising flags based on en
  - `GET /flags` returns a list of flags
  - `GET /flags/$FLAG_NAME/$ENVIRONMENT` returns the flag state for a particular environment. If environment is not found it will fall back to the `default` enviornment. If the `default` environment is not found it will fall back to a global default.
 
-That's it.
+#### Reference
+
+There are two differnt types of flags `BOOL` and `PERCENT`.
+
+- `BOOL` returns the same value all the time (i.e either true or false).
+- `PERCENT` returns true $PERCENT% of the time. Useful for things like doing blue green deployments or tracing
