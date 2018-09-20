@@ -18,7 +18,7 @@ sudo chmod +x /usr/local/bin/flagctl
 
 ### Usage
 
-#### CLI
+#### via CLI
 
 - `flagctl serve`: Start the HTTP API server on port 8082
 - `flagctl set [FLAG_NAME] ([ENV_NAME]) [FLAG_TYPE] [FLAG_VALUE]`: Setup a flag
@@ -26,10 +26,15 @@ sudo chmod +x /usr/local/bin/flagctl
 
 Note: ENV_NAME is optional but could be useful for customising flags based on environments
 
-#### HTTP api usage
+#### via HTTP API
 
  - `GET /flags` returns a list of flags
  - `GET /flags/$FLAG_NAME/$ENVIRONMENT` returns the flag state for a particular environment. If environment is not found it will fall back to the `default` enviornment. If the `default` environment is not found it will fall back to a global default.
+
+#### via Libraries
+
+ - [Go]('./master/client')
+ - [Javascript]('https://github.com/mnbbrown/flagger-js-client')
 
 #### Reference
 
