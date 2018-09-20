@@ -11,7 +11,7 @@ import (
 var (
 	globalDefault = &Flag{
 		Type:          BOOL,
-		InternalValue: true,
+		InternalValue: 1,
 	}
 )
 
@@ -25,8 +25,8 @@ const (
 
 // Flag is a flag ;)
 type Flag struct {
-	Type          flagType    `json:"type"`
-	InternalValue interface{} `json:"value"`
+	Type          flagType `json:"type"`
+	InternalValue int      `json:"value"`
 }
 
 // MarshalBinary implements encoding support for redis
@@ -43,15 +43,14 @@ func (f *Flag) UnmarshalBinary(data []byte) error {
 }
 
 // Value returns the calculated flag value
-func (f *Flag) Value() (bool, bool) {
+func (f *Flag) Value() bool {
 	switch f.Type {
 	case BOOL:
-		return false, f.InternalValue.(bool)
+		return f.InternalValue != 0
 	case PERCENT:
-		asFloat, ok := f.InternalValue.(float64)
-		return (rand.Float64() * 100) < asFloat, ok
+		return (rand.Float32() * 100) < float32(f.InternalValue)
 	}
-	return true, false
+	return globalDefault.Value()
 }
 
 // SaveFlag saves a flag to redis

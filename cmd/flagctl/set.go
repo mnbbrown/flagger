@@ -15,10 +15,16 @@ var setCommand = &cobra.Command{
 		switch len(args) {
 		case 3:
 			fmt.Printf("Setting flag %s", args[0])
-			client.Set(args[0], "default", args[2], args[3])
+			err := client.Set(args[0], "default", args[1], args[2])
+			if err != nil {
+				fmt.Printf("Failed: %v", err)
+			}
 		case 4:
 			fmt.Printf("Setting flag %s (environment: %s)", args[0], args[1])
-			client.Set(args[0], args[1], args[2], args[3])
+			err := client.Set(args[0], args[1], args[2], args[3])
+			if err != nil {
+				fmt.Printf("Failed: %v", err)
+			}
 		default:
 			fmt.Println("Incorrect number of arguments")
 			os.Exit(1)

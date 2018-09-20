@@ -21,14 +21,15 @@ sudo chmod +x /usr/local/bin/flagctl
 #### via CLI
 
 - `flagctl serve`: Start the HTTP API server on port 8082
-- `flagctl set [FLAG_NAME] ([ENV_NAME]) [FLAG_TYPE] [FLAG_VALUE]`: Setup a flag
-- `flagctl get [FLAG_NAME] ([ENV_NAME])`: Get a flags state
+- `flagctl set FLAG_NAME [ENV_NAME] FLAG_TYPE FLAG_VALUE`: Create or update a flag
+- `flagctl get FLAG_NAME [ENV_NAME]`: Get a flags state
 
 Note: ENV_NAME is optional but could be useful for customising flags based on environments
 
 #### via HTTP API
 
  - `GET /flags` returns a list of flags
+ - `GET /flags/$FLAG_NAME` returns a flag state.
  - `GET /flags/$FLAG_NAME/$ENVIRONMENT` returns the flag state for a particular environment. If environment is not found it will fall back to the `default` enviornment. If the `default` environment is not found it will fall back to a global default.
 
 #### via Libraries

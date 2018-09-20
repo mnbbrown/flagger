@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -30,7 +31,7 @@ func (c *Client) get(flag, env string) (bool, error) {
 }
 
 func (c *Client) getURL(flag, env string) string {
-	return fmt.Sprintf("%s/%s/%s", c.URL, flag, env)
+	return fmt.Sprintf("%s/flags/%s/%s", c.URL, flag, env)
 }
 
 // Set sets a flag
@@ -49,9 +50,12 @@ func (c *Client) Set(flag, env, flagType, value string) error {
 	url := c.getURL(flag, env)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	req.Header.Set("Content-Type", "application/json")
-	_, err = http.DefaultClient.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
+	}
+	if resp.StatusCode != 200 {
+		return errors.New("Bad request")
 	}
 	return nil
 }

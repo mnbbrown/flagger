@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -33,13 +34,46 @@ func getFlag(rw http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	f, ok := flag.Value()
-	if !ok {
-		http.Error(rw, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	v := strconv.FormatBool(f)
+	v := strconv.FormatBool(flag.Value())
 	rw.Write([]byte(v))
+}
+
+type flagRequest struct {
+	Value string `json:"value"`
+	Type  string `json:"type"`
+}
+
+func (f *flagRequest) Flag() (*flagger.Flag, error) {
+	if f.Value == "true" {
+		f.Value = "1"
+	}
+	if f.Value == "false" {
+		f.Value = "0"
+	}
+	i, err := strconv.Atoi(f.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	switch f.Type {
+	case "bool", "BOOL":
+		if i > 0 {
+			i = 1
+		}
+		if i < 0 {
+			i = -1
+		}
+		return &flagger.Flag{InternalValue: i, Type: flagger.BOOL}, nil
+	case "percent", "PERCENT":
+		if i > 100 {
+			i = 100
+		}
+		if i < 100 {
+			i = 0
+		}
+		return &flagger.Flag{InternalValue: i, Type: flagger.PERCENT}, nil
+	}
+	return nil, errors.New("flag type must be either bool or percent")
 }
 
 func setFlag(rw http.ResponseWriter, req *http.Request) {
@@ -49,15 +83,24 @@ func setFlag(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "name and environment required", http.StatusBadRequest)
 		return
 	}
-	var f *flagger.Flag
+	var f *flagRequest
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
 	if err := decoder.Decode(&f); err != nil {
+		log.Println(err)
 		http.Error(rw, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	err := flagger.SaveFlag(redisClient, name, environment, f)
+	flag, err := f.Flag()
 	if err != nil {
+		log.Println(err)
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Printf("Saving flag: %v", f)
+	err = flagger.SaveFlag(redisClient, name, environment, flag)
+	if err != nil {
+		log.Println(err)
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
