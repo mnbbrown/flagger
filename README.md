@@ -33,8 +33,8 @@ Note: ENV_NAME is optional but could be useful for customising flags based on en
 
 #### via Libraries
 
- - [Go]('./master/client')
- - [Javascript]('https://github.com/mnbbrown/flagger-js-client')
+ - [Go](client)
+ - [Javascript](https://github.com/mnbbrown/flagger-js-client)
 
 #### Reference
 
