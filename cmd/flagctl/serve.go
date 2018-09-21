@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -13,7 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var redisHost string
 var redisClient *redis.Client
+var servePort int
 
 func getFlag(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
@@ -76,6 +79,22 @@ func (f *flagRequest) Flag() (*flagger.Flag, error) {
 	return nil, errors.New("flag type must be either bool or percent")
 }
 
+func listFlags(rw http.ResponseWriter, req *http.Request) {
+	flags, err := flagger.ListFlags(redisClient)
+	if err != nil {
+		log.Println(err)
+		http.Error(rw, "InternalServerError", http.StatusInternalServerError)
+		return
+	}
+	b, err := json.Marshal(flags)
+	if err != nil {
+		log.Println(err)
+		http.Error(rw, "InternalServerError", http.StatusInternalServerError)
+		return
+	}
+	rw.Write(b)
+}
+
 func setFlag(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
 	environment := chi.URLParam(req, "environment")
@@ -118,10 +137,12 @@ func Serve() {
 		panic(err)
 	}
 	r := chi.NewRouter()
+	r.Get("/flags", listFlags)
 	r.Get("/flags/{name}/{environment}", getFlag)
 	r.Post("/flags/{name}/{environment}", setFlag)
-	log.Println("Listening on :8082")
-	http.ListenAndServe(":8082", r)
+	bindAddr := fmt.Sprintf(":%v", servePort)
+	log.Printf("Listening on %s", bindAddr)
+	http.ListenAndServe(bindAddr, r)
 }
 
 // ServeCommand is a cobra command for serving the API
@@ -133,5 +154,7 @@ var serveCommand = &cobra.Command{
 }
 
 func init() {
+	serveCommand.Flags().StringVarP(&redisHost, "redis", "", "localhost:6379", "redis server address")
+	serveCommand.Flags().IntVarP(&servePort, "port", "p", 8082, "http api port")
 	rootCmd.AddCommand(serveCommand)
 }

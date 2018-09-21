@@ -1,2 +1,4 @@
-api/flagger
-api/build
+flatctl
+dist
+build
+__dist

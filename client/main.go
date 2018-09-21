@@ -8,12 +8,30 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+
+	flagger "github.com/mnbbrown/flagger/pkg"
 )
 
 // Client is the flagger client
 type Client struct {
 	URL     string
 	Default bool
+}
+
+// List returns a list of all flags
+func (c *Client) List() (map[string]map[string]*flagger.Flag, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/flags", c.URL))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	response := make(map[string]map[string]*flagger.Flag)
+	decoder := json.NewDecoder(resp.Body)
+	err = decoder.Decode(&response)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
 func (c *Client) get(flag, env string) (bool, error) {
@@ -49,6 +67,10 @@ func (c *Client) Set(flag, env, flagType, value string) error {
 	}
 	url := c.getURL(flag, env)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		return err
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

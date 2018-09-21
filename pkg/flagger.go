@@ -3,6 +3,7 @@ package flagger
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"math/rand"
 
 	"github.com/go-redis/redis"
@@ -36,10 +37,7 @@ func (f *Flag) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary implements encoding support for redis
 func (f *Flag) UnmarshalBinary(data []byte) error {
-	if err := json.Unmarshal(data, &f); err != nil {
-		return err
-	}
-	return nil
+	return json.Unmarshal(data, &f)
 }
 
 // Value returns the calculated flag value
@@ -83,4 +81,46 @@ func GetFlag(redisClient *redis.Client, name, environment string) (*Flag, error)
 		return nil, err
 	}
 	return f, nil
+}
+
+// ListFlags returns a list of flags grouped by name and environment
+func ListFlags(redisClient *redis.Client) (result map[string]map[string]*Flag, err error) {
+	result = make(map[string]map[string]*Flag)
+	var cursor uint64
+	var n int
+	var keys []string
+	for {
+		var k []string
+		k, cursor, err = redisClient.Scan(cursor, "*", 10).Result()
+		if err != nil {
+			return nil, err
+		}
+		n += len(k)
+		keys = append(keys, k...)
+		if cursor == 0 {
+			break
+		}
+	}
+	for _, key := range keys {
+		result[key] = make(map[string]*Flag)
+		resp := redisClient.HGetAll(key)
+		if resp.Err() != nil {
+			log.Println(resp.Err())
+			continue
+		}
+		res, err := resp.Result()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		for env := range res {
+			flag, err := GetFlag(redisClient, key, env)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			result[key][env] = flag
+		}
+	}
+	return result, nil
 }
