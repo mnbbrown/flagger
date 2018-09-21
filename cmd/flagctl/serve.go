@@ -7,16 +7,20 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi"
 	"github.com/go-redis/redis"
 	flagger "github.com/mnbbrown/flagger/pkg"
+	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 )
 
 var redisHost string
 var redisClient *redis.Client
 var servePort int
+var serveUI bool
+var filesDir string
 
 func getFlag(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
@@ -71,7 +75,7 @@ func (f *flagRequest) Flag() (*flagger.Flag, error) {
 		if i > 100 {
 			i = 100
 		}
-		if i < 100 {
+		if i < 0 {
 			i = 0
 		}
 		return &flagger.Flag{InternalValue: i, Type: flagger.PERCENT}, nil
@@ -92,6 +96,7 @@ func listFlags(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "InternalServerError", http.StatusInternalServerError)
 		return
 	}
+	rw.Header().Set("Content-Type", "application/json")
 	rw.Write(b)
 }
 
@@ -126,10 +131,28 @@ func setFlag(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("OK"))
 }
 
+func uiServer(r chi.Router, path string, root http.FileSystem) {
+	if strings.ContainsAny(path, "{}*") {
+		panic("FileServer does not permit URL parameters.")
+	}
+
+	fs := http.StripPrefix(path, http.FileServer(root))
+
+	if path != "/" && path[len(path)-1] != '/' {
+		r.Get(path, http.RedirectHandler(path+"/", 301).ServeHTTP)
+		path += "/"
+	}
+	path += "*"
+
+	r.Get(path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fs.ServeHTTP(w, r)
+	}))
+}
+
 // Serve runs the HTTP server
 func Serve() {
 	redisClient = redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: redisHost,
 		DB:   0,
 	})
 
@@ -140,9 +163,13 @@ func Serve() {
 	r.Get("/flags", listFlags)
 	r.Get("/flags/{name}/{environment}", getFlag)
 	r.Post("/flags/{name}/{environment}", setFlag)
+	if serveUI {
+		log.Printf("Serving ui from %s", filesDir)
+		uiServer(r, "/ui", http.Dir(filesDir))
+	}
 	bindAddr := fmt.Sprintf(":%v", servePort)
 	log.Printf("Listening on %s", bindAddr)
-	http.ListenAndServe(bindAddr, r)
+	http.ListenAndServe(bindAddr, cors.Default().Handler(r))
 }
 
 // ServeCommand is a cobra command for serving the API
@@ -156,5 +183,7 @@ var serveCommand = &cobra.Command{
 func init() {
 	serveCommand.Flags().StringVarP(&redisHost, "redis", "", "localhost:6379", "redis server address")
 	serveCommand.Flags().IntVarP(&servePort, "port", "p", 8082, "http api port")
+	serveCommand.Flags().BoolVarP(&serveUI, "ui", "", true, "serve the UI on /ui")
+	serveCommand.Flags().StringVarP(&filesDir, "uiDir", "", "/ui", "Directory from which to serve the UI")
 	rootCmd.AddCommand(serveCommand)
 }

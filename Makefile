@@ -33,8 +33,16 @@ build_all: setup
 clean:
 	find ${ROOT_DIR}/__dist -name '${BINARY}[-?][a-zA-Z0-9]*[-?][a-zA-Z0-9]*' -delete
 
-docker: build_all
+docker: build_all build_web
 	docker build -f Dockerfile -t $(DOCKER_IMAGE):latest __dist/
+
+
+clean_web:
+	rm -rf __dist/ui
+
+build_web: clean_web
+	cd ui && PUBLIC_URL=/ui NODE_ENV=production npm run build
+	cp -R ui/build __dist/ui
 
 test:
 	go test ./pkg ./cmd/flagctl ./client
