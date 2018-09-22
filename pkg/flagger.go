@@ -3,8 +3,9 @@ package flagger
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/go-redis/redis"
 )
@@ -26,8 +27,11 @@ const (
 
 // Flag is a flag ;)
 type Flag struct {
+	Name          string
 	Type          flagType `json:"type"`
 	InternalValue int      `json:"value"`
+	Namespace     string   `json:"namespace"`
+	Tags          []string `json:"tags"`
 }
 
 // MarshalBinary implements encoding support for redis
@@ -51,9 +55,45 @@ func (f *Flag) Value() bool {
 	return globalDefault.Value()
 }
 
+// Flagger is implemented by each of the storage backends
+type Flagger interface {
+	SaveFlag(flag *Flag) error
+	GetFlag(name string) (*Flag, error)
+	GetFlagWithTags(name string, tags []string) (*Flag, error)
+	ListFlags() ([]*Flag, error)
+}
+
+// RedisFlagger is a redis backed flagger
+type RedisFlagger struct {
+	client    *redis.Client
+	namespace string
+}
+
+// NewRedisFlagger creates a new flagger backed by redis
+func NewRedisFlagger(host string, db int) (Flagger, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr: host,
+		DB:   db,
+	})
+	if err := client.Ping().Err(); err != nil {
+		return nil, err
+	}
+	return &RedisFlagger{client: client, namespace: "flagger"}, nil
+}
+
+func (rf *RedisFlagger) getKeyName(key ...string) string {
+	path := strings.Join(key, ":")
+	return fmt.Sprintf("%s:%s", rf.namespace, path)
+}
+
 // SaveFlag saves a flag to redis
-func SaveFlag(redisClient *redis.Client, name, environment string, flag *Flag) error {
-	if err := redisClient.HSet(name, environment, flag).Err(); err != nil {
+func (rf *RedisFlagger) SaveFlag(flag *Flag) error {
+	for _, tag := range flag.Tags {
+		if err := rf.client.SAdd(rf.getKeyName("TAGS", tag), flag.Name).Err(); err != nil {
+			return err
+		}
+	}
+	if err := rf.client.Set(rf.getKeyName("IDS", flag.Name), flag, 0).Err(); err != nil {
 		return err
 	}
 	return nil
@@ -62,65 +102,54 @@ func SaveFlag(redisClient *redis.Client, name, environment string, flag *Flag) e
 // ErrFlagNotFound means the flag was not found
 var ErrFlagNotFound = errors.New("Flag not found")
 
-// GetFlag loads a flag from a redis client
-func GetFlag(redisClient *redis.Client, name, environment string) (*Flag, error) {
-	var result *redis.StringCmd
-	if result = redisClient.HGet(name, environment); result.Err() == redis.Nil {
-		result = redisClient.HGet(name, "default")
+func flagInResults(flag string, tags []string) bool {
+	for _, f := range tags {
+		if f == flag {
+			return true
+		}
 	}
+	return false
+}
 
-	if result.Err() == redis.Nil {
+// GetFlag loads a flag without tags
+func (rf *RedisFlagger) GetFlag(name string) (*Flag, error) {
+	return rf.GetFlagWithTags(name, []string{})
+}
+
+// GetFlagWithTags loads a flag from a redis client
+func (rf *RedisFlagger) GetFlagWithTags(name string, tags []string) (*Flag, error) {
+
+	var flagsWithTags []string
+	if len(tags) > 0 {
+		prefixed := []string{}
+		for _, tag := range tags {
+			prefixed = append(prefixed, rf.getKeyName("TAGS", tag))
+		}
+
+		res := rf.client.SInter(prefixed...)
+		if res.Err() != nil {
+			return nil, res.Err()
+		}
+		var err error
+		flagsWithTags, err = res.Result()
+		if err != nil {
+			return nil, err
+		}
+	}
+	fmt.Println(flagsWithTags, tags)
+
+	if len(tags) > 0 && !flagInResults(name, flagsWithTags) {
 		return nil, ErrFlagNotFound
-	} else if result.Err() != nil {
-		return nil, result.Err()
 	}
 
 	f := &Flag{}
-	err := result.Scan(f)
-	if err != nil {
+	if err := rf.client.Get(rf.getKeyName("IDS", name)).Scan(f); err != nil {
 		return nil, err
 	}
 	return f, nil
 }
 
 // ListFlags returns a list of flags grouped by name and environment
-func ListFlags(redisClient *redis.Client) (result map[string]map[string]*Flag, err error) {
-	result = make(map[string]map[string]*Flag)
-	var cursor uint64
-	var n int
-	var keys []string
-	for {
-		var k []string
-		k, cursor, err = redisClient.Scan(cursor, "*", 10).Result()
-		if err != nil {
-			return nil, err
-		}
-		n += len(k)
-		keys = append(keys, k...)
-		if cursor == 0 {
-			break
-		}
-	}
-	for _, key := range keys {
-		result[key] = make(map[string]*Flag)
-		resp := redisClient.HGetAll(key)
-		if resp.Err() != nil {
-			log.Println(resp.Err())
-			continue
-		}
-		res, err := resp.Result()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		for env := range res {
-			flag, err := GetFlag(redisClient, key, env)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			result[key][env] = flag
-		}
-	}
-	return result, nil
+func (rf *RedisFlagger) ListFlags() (flags []*Flag, err error) {
+	return nil, nil
 }
