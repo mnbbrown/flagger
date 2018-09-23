@@ -4,6 +4,9 @@ go:
   - "1.10.x"
   - master
 
+services:
+  - redis-server
+
 os:
   - linux
   - osx
