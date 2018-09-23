@@ -9,8 +9,8 @@ os:
   - osx
 
 script:
-  - env GO111MODULE=on go build
-  - env GO111MODULE=on go test
+  - env GO111MODULE=on go build -v ./...
+  - env GO111MODULE=on go test -v ./...
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
