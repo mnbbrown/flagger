@@ -1,5 +1,7 @@
 ## flagger
 [![Go Report Card](https://goreportcard.com/badge/github.com/mnbbrown/flagger)](https://goreportcard.com/report/github.com/mnbbrown/flagger)
+[![Build Status](https://travis-ci.org/mnbbrown/flagger.svg?branch=master)](https://travis-ci.org/mnbbrown/flagger)
+[![codecov](https://codecov.io/gh/mnbbrown/flagger/branch/master/graph/badge.svg)](https://codecov.io/gh/mnbbrown/flagger)
 
 *flagger* is a simple feature flag microservice backed by redis.
 
