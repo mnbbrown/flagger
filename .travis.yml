@@ -9,11 +9,10 @@ services:
 
 os:
   - linux
-  - osx
 
 script:
   - env GO111MODULE=on go build -v ./...
-  - env GO111MODULE=on go test -v ./...
+  - env GO111MODULE=on ops/test.sh
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
