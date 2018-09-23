@@ -2,3 +2,5 @@ flatctl
 dist
 build
 __dist
+profile.out
+coverage.txt

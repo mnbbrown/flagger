@@ -1,4 +1,5 @@
 ## flagger
+[![Go Report Card](https://goreportcard.com/badge/github.com/mnbbrown/flagger)](https://goreportcard.com/report/github.com/mnbbrown/flagger)
 
 *flagger* is a simple feature flag microservice backed by redis.
 

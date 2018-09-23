@@ -11,7 +11,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-redis/redis"
-	flagger "github.com/mnbbrown/flagger/pkg"
+	"github.com/mnbbrown/flagger/pkg"
 	"github.com/rs/cors"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +22,8 @@ var servePort int
 var serveUI bool
 var filesDir string
 
+var f flagger.Flagger
+
 func getFlag(rw http.ResponseWriter, req *http.Request) {
 	name := chi.URLParam(req, "name")
 	environment := chi.URLParam(req, "environment")
@@ -30,7 +32,7 @@ func getFlag(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	flag, err := flagger.GetFlag(redisClient, name, environment)
+	flag, err := f.GetFlagWithTags(name, []string{environment})
 	if err != nil {
 		switch err {
 		case flagger.ErrFlagNotFound:
@@ -84,7 +86,7 @@ func (f *flagRequest) Flag() (*flagger.Flag, error) {
 }
 
 func listFlags(rw http.ResponseWriter, req *http.Request) {
-	flags, err := flagger.ListFlags(redisClient)
+	flags, err := f.ListFlags()
 	if err != nil {
 		log.Println(err)
 		http.Error(rw, "InternalServerError", http.StatusInternalServerError)
@@ -107,22 +109,22 @@ func setFlag(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, "name and environment required", http.StatusBadRequest)
 		return
 	}
-	var f *flagRequest
+	var fr *flagRequest
 	decoder := json.NewDecoder(req.Body)
 	defer req.Body.Close()
-	if err := decoder.Decode(&f); err != nil {
+	if err := decoder.Decode(&fr); err != nil {
 		log.Println(err)
 		http.Error(rw, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	flag, err := f.Flag()
+	flag, err := fr.Flag()
 	if err != nil {
 		log.Println(err)
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 	log.Printf("Saving flag: %v", f)
-	err = flagger.SaveFlag(redisClient, name, environment, flag)
+	err = f.SaveFlag(flag)
 	if err != nil {
 		log.Println(err)
 		http.Error(rw, "Internal Server Error", http.StatusInternalServerError)
@@ -151,14 +153,11 @@ func uiServer(r chi.Router, path string, root http.FileSystem) {
 
 // Serve runs the HTTP server
 func Serve() {
-	redisClient = redis.NewClient(&redis.Options{
-		Addr: redisHost,
-		DB:   0,
-	})
-
-	if _, err := redisClient.Ping().Result(); err != nil {
+	var err error
+	if f, err = flagger.NewRedisFlagger(redisHost, 0); err != nil {
 		panic(err)
 	}
+
 	r := chi.NewRouter()
 	r.Get("/flags", listFlags)
 	r.Get("/flags/{name}/{environment}", getFlag)

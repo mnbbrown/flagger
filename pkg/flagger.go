@@ -136,7 +136,6 @@ func (rf *RedisFlagger) GetFlagWithTags(name string, tags []string) (*Flag, erro
 			return nil, err
 		}
 	}
-	fmt.Println(flagsWithTags, tags)
 
 	if len(tags) > 0 && !flagInResults(name, flagsWithTags) {
 		return nil, ErrFlagNotFound
@@ -144,7 +143,14 @@ func (rf *RedisFlagger) GetFlagWithTags(name string, tags []string) (*Flag, erro
 
 	f := &Flag{}
 	if err := rf.client.Get(rf.getKeyName("IDS", name)).Scan(f); err != nil {
+		if err == redis.Nil {
+			return nil, ErrFlagNotFound
+		}
 		return nil, err
+	}
+
+	if f == nil {
+		return nil, ErrFlagNotFound
 	}
 	return f, nil
 }

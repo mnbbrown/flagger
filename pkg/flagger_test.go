@@ -100,3 +100,51 @@ func TestFlagWithMultipleTags(t *testing.T) {
 		return
 	}
 }
+
+func TestFlagNotFound(t *testing.T) {
+	flagger, err := NewRedisFlagger("localhost:6379", 0)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	_, err = flagger.GetFlag("nofoundtest")
+	if err != ErrFlagNotFound {
+		t.Error("Should return flag not found")
+		return
+	}
+}
+
+func TestFlagsNotFound(t *testing.T) {
+	flagger, err := NewRedisFlagger("localhost:6379", 0)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	f := &Flag{
+		Name:          "test",
+		Type:          BOOL,
+		InternalValue: 1,
+		Tags:          []string{"foo", "buzz"},
+	}
+	if err := flagger.SaveFlag(f); err != nil {
+		t.Error(err)
+		return
+	}
+
+	_, err = flagger.GetFlagWithTags("test", []string{"tag"})
+	if err != ErrFlagNotFound {
+		t.Error("Should return flag not found")
+		return
+	}
+
+	flag, err := flagger.GetFlagWithTags("test", []string{"foo", "buzz"})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if !reflect.DeepEqual(f, flag) {
+		t.Error("Not the same flag")
+		return
+	}
+}
